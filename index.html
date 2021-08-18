@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hotspot model</title>
+	
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+		<script src="https://use.fontawesome.com/releases/v5.15.3/js/all.js" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="assets/css/style.css">
+	<link rel="shortcut icon" href="assets/favicon.png" type="image/png">
+
+</head>
+
+
+
+<style>
+
+.annotation-marker {
+            color: black;
+            line-height: 1.8;
+            text-align: center;
+            font-weight: bold;
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            border-radius: 15px;
+            border: 2px solid red;
+            background: black;
+            visibility: hidden;
+            box-shadow: 5px 5px 15px 1px #000000;
+            z-index: 0;
+        }
+
+        .annotation-label {
+            position: absolute;
+            max-width: 450px;
+            min-height: 50px;
+            padding: 8px;
+            padding-left: 12px;
+            padding-right: 12px;
+            background: #ffffff;
+            color: #000000;
+            -webkit-border-radius: 3px;
+            -moz-border-radius: 3px;
+            border-radius: 8px;
+            border: #ffffff solid 2px;
+            box-shadow: 5px 5px 15px 1px #000000;
+            z-index: 90000;
+        }
+
+        .annotation-label:after {
+            content: '';
+            position: absolute;
+            border-style: solid;
+            border-width: 5px 8px 5px 0;
+            border-color: transparent white;
+            display: block;
+            width: 0;
+            z-index: 1;
+            margin-top: -11px;
+            left: -12px;
+            top: 20px;
+        }
+
+        .annotation-label:before {
+            content: '';
+            position: absolute;
+            border-style: solid;
+            border-width: 9px 13px 9px 0;
+            border-color: transparent #ffffff;
+            display: block;
+            width: 0;
+            z-index: 0;
+            margin-top: -12px;
+            left: -15px;
+            top: 20px;
+        }
+
+        .annotation-title {
+            font: normal 20px arial;
+            margin-bottom: 8px;
+        }
+
+        .annotation-desc {
+            font: normal 14px arial;
+        }
+
+</style>
+
+<body>
+<!--<div id="treePanel" class="treePanel"></div>-->
+<canvas id="myCanvas"></canvas>
+<canvas id="myNavCubeCanvas"></canvas>
+<div id="info">
+    <h1 style="font-weight: 750">  ARK-BIM</h1>
+    <h2 style="color: #a1a1a1; font-weight: 550"> Hotspot Model  &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp &nbsp </h2>
+	<p style="color: #929292">version 1.5.1</p>
+</div>
+
+<div id="my-gui-container" class="btn-group">
+    <button style="text-align: left">
+    <span style="color: #fff"> <i class="fas fa-cube fa-lg"></i>
+	</span> 
+	&nbsp
+	<a href="javascript:viewer.cameraFlight.flyTo({ projection: 'ortho', duration: 0.5  })" style="color:white; text-decoration:none">Orthographic view</a></button>
+    <button style="text-align: left">
+    <span style="color: #fff"> <i class="fab fa-unity fa-lg"></i>
+	</span> 
+	&nbsp
+    <a href="javascript:viewer.cameraFlight.flyTo({ projection: 'perspective', duration: 0.5  })" style="color:white; text-decoration:none"> Perspective view</a></button>
+    &nbsp
+    <button id="myBtn" style="text-align: left">
+    <span style="color: #fff"> <i class="fas fa-info-circle fa-lg"></i>
+	</span> 
+	&nbsp &nbsp Info</button>
+  &nbsp
+</div>
+
+<div id="myModal" class="modal">
+
+  <!-- Modal content -->
+  <div class="modal-content">
+    <span class="close">&times;</span>
+	<h1> ARK-BIM Hotspot informative model</h1>
+	<h3> Info </h3>
+    <p>Through this simple tool you can investigate model information via numeric hotspots.</p>
+	<p>version 1.5.1 © Filippo Diara - based on XEOKIT</p>
+	<h3> How it works </h3>
+	<p>Click on hotspots number and find out model information.</p>
+	<h3> How to navigate the model</h3>
+	<p> Mouse Left click: 360° orbit /// Mouse Right click: Axis Pan /// Mouse Wheel: Zoom</p>
+  </div>
+
+</div>
+
+</body>
+
+<!--<script src="dist/main.js" defer></script>-->
+
+<script type="module">
+
+    import {Viewer} from "./lib/xeokit/viewer/Viewer.js";
+    import {NavCubePlugin} from "./lib/xeokit/plugins/NavCubePlugin/NavCubePlugin.js";
+    import {XKTLoaderPlugin} from "./lib/xeokit/plugins/XKTLoaderPlugin/XKTLoaderPlugin.js";
+	import {AnnotationsPlugin} from "./lib/xeokit/plugins/AnnotationsPlugin/AnnotationsPlugin.js";
+    import {DirLight} from "./lib/xeokit/viewer/scene/lights/DirLight.js";
+    import {SAO} from "./lib/xeokit/viewer/scene/postfx/SAO.js";
+	import {Mesh} from "./lib/xeokit/viewer/scene/mesh/Mesh.js";
+    import {buildGridGeometry} from "./lib/xeokit/viewer/scene/geometry/builders/buildGridGeometry.js";
+    import {PhongMaterial} from "./lib/xeokit/viewer/scene/materials/PhongMaterial.js";
+    import {VBOGeometry} from "./lib/xeokit/viewer/scene/geometry/VBOGeometry.js";
+
+    const viewer = new Viewer({
+        canvasId: "myCanvas",
+        transparent: true,
+		antialias: true
+    });
+	
+	const sao = viewer.scene.sao;
+
+sao.enabled = true; // Enable SAO - only works if supported (see above)
+sao.intensity = 0.15;
+sao.bias = 0.5;
+sao.scale = 500.0;
+sao.minResolution = 0.0;
+sao.kernelRadius = 100;
+sao.blendCutoff = 0.2;
+
+        const xktLoader = new XKTLoaderPlugin(viewer);
+		
+
+        const model = xktLoader.load({
+            id: "myModel",
+            src: "data/sample.xkt",
+            metaModelSrc: "data/meta.json",
+            edges: false
+        });
+		
+		
+			    new Mesh(viewer.scene, {
+        geometry: new VBOGeometry(viewer.scene, buildGridGeometry({
+            size: 55,
+            divisions: 25
+        })),
+        material: new PhongMaterial(viewer.scene, {
+            color: [0.0, 0.0, 0.0],
+            emissive: [0.3, 0.3, 0.3]
+        }),
+        position: [10, 0, -15],
+        collidable: true
+    });
+		
+	
+    model.on("loaded", function() {
+        viewer.cameraFlight.flyTo(model);
+    });
+	
+	window.viewer = viewer;
+	viewer.cameraControl.followPointer = true;
+		
+		    new NavCubePlugin(viewer, {
+        canvasId: "myNavCubeCanvas",
+        visible: true,           // Initially visible (default)
+        size: 200,               // NavCube size in pixels (default is 200)
+        alignment: "topRight",   // Align NavCube to top-left of Viewer canvas
+        topMargin: 170,          // 170 pixels margin from top of Viewer canvas
+        cameraFly: true,       // Fly camera to each selected axis/diagonal
+        cameraFitFOV: 45,        // How much field-of-view the scene takes once camera has fitted it to view
+        cameraFlyDuration: 0.5 // How long (in seconds) camera takes to fly to each new axis/diagonal
+    });
+	
+var modal = document.getElementById("myModal");
+
+// Get the button that opens the modal
+var btn = document.getElementById("myBtn");
+
+// Get the <span> element that closes the modal
+var span = document.getElementsByClassName("close")[0];
+
+// When the user clicks the button, open the modal 
+btn.onclick = function() {
+  modal.style.display = "block";
+}
+
+// When the user clicks on <span> (x), close the modal
+span.onclick = function() {
+  modal.style.display = "none";
+}
+
+// When the user clicks anywhere outside of the modal, close it
+window.onclick = function(event) {
+  if (event.target == modal) {
+    modal.style.display = "none";
+  }
+};
+		const annotations = new AnnotationsPlugin(viewer, {
+
+        markerHTML: "<div class='annotation-marker' style='background-color: {{markerBGColor}};'>{{glyph}}</div>",
+        labelHTML: "<div class='annotation-label' style='background-color: {{labelBGColor}};'>\
+            <div class='annotation-title'>{{title}}</div>\
+            <div class='annotation-desc'>{{description}}</div>\
+            </div>",
+
+        values: {
+            markerBGColor: "red",
+            labelBGColor: "white",
+            glyph: "X",
+            title: "Untitled",
+            description: "No description"
+        }
+		
+        });
+
+        var prevAnnotationClicked = null;
+	
+	    annotations.on("markerClicked", (annotation) => {
+        annotation.setLabelShown(!annotation.getLabelShown());              
+		});
+	
+		
+		annotations.createAnnotation({
+
+            id: "myAnnotation1",
+
+            worldPos: [7.239, 0.29, -2.47905],
+
+            occludable: true,
+            markerShown: true,
+            labelShown: false,
+
+            values: {
+                glyph: "1",
+                title: "Fanum / Sacraria Martis et Opis",
+                description: "La Regia serviva per la celebrazione di riti. Come le fonti scritte riportano, si trovavano nell’edificio, due più piccoli santuari (lat. sacrarium) per Marte e Ops Consiva. Nel sacrario di Marte, nel periodo tardo repubblicano e all’inizio del periodo imperiale, si tenevano vecchi scudi e lance, che venivano portati in processione dai sacerdoti Salii. Inoltre, accanto vi era un fuoco che veniva utilizzato per le offerte. Queste due sale di culto per Marte e Ops Consiva sono associati ai piccoli spazi lungo il lato sud della corte, in relazione alle rovine, che sono ancora visibili nel sito archeologico.",
+                markerBGColor: "white"
+            }	
+			
+       });
+
+ viewer.scene.clearLights();
+
+    new DirLight(viewer.scene, {
+        id: "keyLight",
+        dir: [0.8, -0.6, -0.8],
+        color: [0.3, 0.3, 0.3],
+        intensity: 0.3,
+        space: "view"
+    });
+
+    new DirLight(viewer.scene, {
+        id: "fillLight",
+        dir: [-0.8, -0.4, -0.4],
+        color: [0.3, 0.3, 0.3],
+        intensity: 1.2,
+        space: "view"
+    });
+
+    new DirLight(viewer.scene, {
+        id: "rimLight",
+        dir: [0.2, -0.8, 0.8],
+        color: [0, 0, 0],
+        intensity: 1,
+        space: "view"
+    });
+
+	
+</script>
+</html>
